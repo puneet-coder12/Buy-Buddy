@@ -56,17 +56,35 @@ export const deleteCouponOnExpiry = inngest.createFunction(
   { event: "app/coupon.expired" },
 
   async ({ event, step }) => {
-    const {data} = event;
-    const expiryDate = new Date(data.expires_at);
+    const { data } = event;
 
-    await step.sleepUntil('wait-for-expiry', expiryDate);
+    // 1️⃣ Guard missing value
+    if (!data.expires_at) {
+      throw new Error("expires_at is missing in event data");
+    }
 
-    await step.run('delete-coupon-from-database', async () => {
+    // 2️⃣ Convert safely
+    let expiryDate = new Date(data.expires_at);
+
+    // 3️⃣ Handle unix timestamp in SECONDS
+    if (typeof data.expires_at === "number") {
+      expiryDate = new Date(data.expires_at * 1000);
+    }
+
+    // 4️⃣ Final validation
+    if (isNaN(expiryDate.getTime())) {
+      throw new Error(`Invalid expiry date: ${data.expires_at}`);
+    }
+
+    // ✅ Now this is 100% safe
+    await step.sleepUntil("wait-for-expiry", expiryDate);
+
+    await step.run("delete-coupon-from-database", async () => {
       await prisma.coupon.deleteMany({
         where: {
           code: data.code,
         },
       });
-    }
-)}
-)
+    });
+  }
+);
