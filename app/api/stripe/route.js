@@ -2,6 +2,8 @@ import { prisma } from "@/src/db";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
+export const runtime = "nodejs";
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export async function POST(request) {
@@ -75,8 +77,4 @@ export async function POST(request) {
     console.error(error);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
-}
-
-export const config = {
-  api : {bodyparser: false}
 }
