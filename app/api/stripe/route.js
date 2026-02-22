@@ -4,18 +4,21 @@ import Stripe from "stripe";
 
 export const runtime = "nodejs";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
 export async function POST(request) {
   try {
-    const body = await request.text();
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error("STRIPE_SECRET_KEY not found");
+    }
 
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    const body = await request.text();
     const sig = request.headers.get("stripe-signature");
 
     const event = stripe.webhooks.constructEvent(
       body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET,
+      process.env.STRIPE_WEBHOOK_SECRET
     );
 
     const handlePaymentIntent = async (paymentIntentId, isPaid) => {
@@ -25,21 +28,18 @@ export async function POST(request) {
 
       const { orderIds, userId, appId } = session.data[0].metadata;
 
-      if (appId !== "buybuddy") {
-        return NextResponse.json({ received: true, message: "Invalid app id" });
-      }
+      if (appId !== "buybuddy") return;
 
       const orderIdsArray = orderIds.split(",");
 
       if (isPaid) {
-        //mark order is paid
         await Promise.all(
-          orderIdsArray.map(async (orderId) => {
-            await prisma.order.update({
+          orderIdsArray.map((orderId) =>
+            prisma.order.update({
               where: { id: orderId },
               data: { isPaid: true },
-            });
-          }),
+            })
+          )
         );
 
         await prisma.user.update({
@@ -47,34 +47,36 @@ export async function POST(request) {
           data: { cart: {} },
         });
       } else {
-        //delete order from database
-        await Promise.all(orderIdsArray.map(async(orderId)=>{
-          await prisma.order.delete({
-            where:{id:orderId}
-          })
-        }))
+        await Promise.all(
+          orderIdsArray.map((orderId) =>
+            prisma.order.delete({
+              where: { id: orderId },
+            })
+          )
+        );
       }
     };
 
     switch (event.type) {
-      case "payment_intent.succeeded": {
+      case "payment_intent.succeeded":
         await handlePaymentIntent(event.data.object.id, true);
         break;
-      }
 
-      case "payment_intent.canceled": {
+      case "payment_intent.canceled":
         await handlePaymentIntent(event.data.object.id, false);
         break;
-      }
 
       default:
-        console.log("Unhandled event type: ", event.type);
-        break;
+        console.log("Unhandled event type:", event.type);
     }
 
     return NextResponse.json({ received: true });
+
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json(
+      { error: error.message },
+      { status: 400 }
+    );
   }
 }
