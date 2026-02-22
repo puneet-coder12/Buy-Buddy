@@ -41,6 +41,8 @@ async function main(base64Image, mimetype) {
       model: process.env.OPENAI_MODEL,
       messages: messages,
     });
+    console.log("trigger rebuild");
+    
     const raw = response.choices[0].message.content
 
     //remove ```json or ``wrapper if present
