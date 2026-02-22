@@ -1,9 +1,19 @@
-import { openai } from "@/configs/openai";
+// import { openai } from "@/configs/openai";
+import OpenAI from "openai";
 import authSeller from "@/middleware/authSeller";
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 async function main(base64Image, mimetype) {
+   if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY not found");
+  }
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: process.env.OPENAI_BASE_URL,
+  });
+
      const messages = [
         {
             "role": "system",
